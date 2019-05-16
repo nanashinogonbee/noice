@@ -1,6 +1,7 @@
 from PIL import Image
 from math import ceil
 import sys
+import os
 import subprocess
 import tkinter as tk
 from tkinter import filedialog
@@ -8,18 +9,12 @@ from tkinter import messagebox
 try:
     import alsaaudio
 except ImportError as e:
-    print('''Please install python3-alsaaudio:
-sudo pip3 install pyalsaaudio
-or
-sudo dnf install python3-alsaaudio''')
-
-
-def okDialog(msg):
-    confirm = messagebox.showerror(
-        'Do I look like I know what a JPEG is?',
-        msg
+    messagebox.showerror(
+        'No required modules!',
+        '''Please install python3-alsaaudio:
+"sudo pip3 install pyalsaaudio" or "sudo dnf install python3-alsaaudio"'''
         )
-    return confirm
+    sys.exit()
 
 
 def sendNotify(message):
@@ -30,43 +25,39 @@ def sendNotify(message):
 def setVolume():
     root = tk.Tk()
     root.withdraw()
-    file_path = filedialog.askopenfilename()
+    file_path = filedialog.askopenfilename(
+        initialdir='.',
+        title='The worst volume controller. Have fun.',
+        filetypes=(
+            ('JPEG', '*.jpg'),
+            ('PNG', '*.png'),
+            ('WEBP', '*.webp'),
+            )
+        )
 
     if not file_path:  # if no files specified ("Cancel" button pressed etc.)
+        messagebox.showerror('oof', 'oof')
         sys.exit()
 
-    ext = file_path.split('.')[-1]
-    if ext in ('jpg', 'png', 'webp'):
-        try:
-            im = Image.open(file_path).convert('RGB')
-        except OSError:
-            print('Image is empty!')
-
-        RGBsum = 0
-        POINTS = im.size[0] * im.size[1]  # quantity of pixels in an image
-        for x in range(im.size[0]):
-            for y in range(im.size[1]):
-                pix = im.getpixel((x, y))  # RGB of a pixel
-                midRGBval = sum(pix) // len(pix)  # mid RGB val ("brightness")
-                RGBsum += midRGBval
-        RGBsum //= POINTS  # middle RGB value ("brightness") of a picture
-
-        bw = im.convert('1')
-        hist = bw.histogram()
-        print(hist)
-
-        """
-        VOLUME = ceil(100 / 255 * RGBsum)  # volume in percents, 255 = 100%
-        m = alsaaudio.Mixer()
-        m.setmute(False)
-        m.setvolume(VOLUME)
-        sendNotify(f'Volume set to {VOLUME}%. ;)')
-        """
-    else:
-        okDialog('Not an image!')
+    im = Image.open(file_path).convert('1')
+    W, H = im.size
+    BRIGHTNESS = im.histogram()[-1] / (W * H) * 100
+    VOLUME = ceil(BRIGHTNESS)  # volume in percents, 255 = 100%
+    m = alsaaudio.Mixer()
+    m.setmute(False)
+    m.setvolume(VOLUME)
+    sendNotify(f'Volume set to {VOLUME}%. ;)')
 
 
 if __name__ == '__main__':
-    setVolume()
+    if os.name == 'posix':
+        setVolume()
+    else:
+        messagebox.showerror(
+            'Unsupported OS!',
+            'This thing runs only on Linux-based operating systems' +
+            'at the moment.'
+            )
 else:
     print('Do not launch this from external scripts!')
+    sys.exit()
